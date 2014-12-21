@@ -1,34 +1,11 @@
-"""
-Implementation of a Modbus Client Using asyncio
------------------------------------------------
-
-Example run::
-
-    import asyncio
-    from pymodbus.client.async2 import ModbusClientProtocol
-
-
-    @asyncio.coroutine
-    def process():
-        transport_, protocol_ = yield from asyncio.get_event_loop().create_connection(ModbusClientProtocol, "localhost", 502)
-
-        result = yield from protocol_.read_coils(1)
-        print("Result: %d" % result.bits[0])
-
-        transport_.close()
-
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(process())
-    loop.close()
-"""
+"""Common logic of asynchronous client."""
 from pymodbus.factory import ClientDecoder
 from pymodbus.exceptions import ConnectionException
 from pymodbus.transaction import ModbusSocketFramer
 from pymodbus.transaction import FifoTransactionManager
 from pymodbus.transaction import DictTransactionManager
 from pymodbus.client.common import ModbusClientMixin
-from asyncio import Protocol, DatagramProtocol, Future
+
 
 #---------------------------------------------------------------------------#
 # Logging
@@ -37,38 +14,44 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-
 #---------------------------------------------------------------------------#
 # Connected Client Protocols
 #---------------------------------------------------------------------------#
-class ModbusClientProtocol(Protocol, ModbusClientMixin):
-    '''
-    This represents the base modbus client protocol.  All the application
-    layer code is deferred to a higher level wrapper.
-    '''
+class ModbusClientProtocol(ModbusClientMixin):
+    """Protocol running high level modbus logic on top of asynchronous loop.
 
-    transport = None
+    Behavior specific to an asynchronous framework like Twisted or asyncio is
+    delegated to an injected adapter class.
 
-    def __init__(self, framer=None):
+    This class is therefore a glue layer between pymodbus logic and a certain
+    async implementation.
+    """
+
+    def __init__(self, async_adapter, framer=None):
         ''' Initializes the framer module
 
-        :param framer: The framer to use for the protocol
+        :param framer: The framer to use for the protocol.
+        :param async_adapter: Adapter for used asynchronous framework.
         '''
         self._connected = False
         self.framer = framer or ModbusSocketFramer(ClientDecoder())
+
+        # set up adapter to async framework:
+        self.async_adapter = async_adapter
+        self.async_adapter.owner = self
+
         if isinstance(self.framer, ModbusSocketFramer):
             self.transaction = DictTransactionManager(self)
         else:
             self.transaction = FifoTransactionManager(self)
 
-    def connection_made(self, transport):
+    def connectionMade(self):
         ''' Called upon a successful client connection.
         '''
         _logger.debug("Client connected to modbus server")
-        self.transport = transport
         self._connected = True
 
-    def connection_lost(self, reason):
+    def connectionLost(self, reason):
         ''' Called upon a client disconnect
 
         :param reason: The reason for the disconnect
@@ -76,11 +59,9 @@ class ModbusClientProtocol(Protocol, ModbusClientMixin):
         _logger.debug("Client disconnected from modbus server: %s" % reason)
         self._connected = False
         for tid in list(self.transaction):
-            handler = self.transaction.getTransaction(tid)
-            assert isinstance(handler, Future)
-            handler.set_exception(ConnectionException('Connection lost during request'))
+            self.async_adapter.raise_future(self.transaction.getTransaction(tid), ConnectionException('Connection lost during request'))
 
-    def data_received(self, data):
+    def dataReceived(self, data):
         ''' Get response, check for valid message, decode result
 
         :param data: The data returned from the server
@@ -93,7 +74,7 @@ class ModbusClientProtocol(Protocol, ModbusClientMixin):
         '''
         request.transaction_id = self.transaction.getNextTID()
         packet = self.framer.buildPacket(request)
-        self.transport.write(packet)
+        self.async_adapter.transport.write(packet)
         return self._buildResponse(request.transaction_id)
 
     def _handleResponse(self, reply):
@@ -104,9 +85,8 @@ class ModbusClientProtocol(Protocol, ModbusClientMixin):
         if reply is not None:
             tid = reply.transaction_id
             handler = self.transaction.getTransaction(tid)
-            assert isinstance(handler, Future)
             if handler:
-                handler.set_result(reply)
+                self.async_adapter.resolve_future(handler, reply)
             else:
                 _logger.debug("Unrequested message: " + str(reply))
 
@@ -115,34 +95,20 @@ class ModbusClientProtocol(Protocol, ModbusClientMixin):
         for the current request.
 
         :param tid: The transaction identifier for this response
-        :returns: A future linked to the latest request
+        :returns: A defer linked to the latest request
         '''
-        f = Future()
-        if self._connected:
-            self.transaction.addTransaction(f, tid)
+        f = self.async_adapter.create_future()
+        if not self._connected:
+            self.async_adapter.raise_future(f, ConnectionException('Client is not connected'))
         else:
-            # mark future as immediately failed:
-            f.set_exception(ConnectionException('Client is not connected'))
+            self.transaction.addTransaction(f, tid)
         return f
 
-
-# Not yet ported:
-# class ModbusUdpClientProtocol
-# class ModbusClientFactory
-
-# asyncio does not have a reconnecting client factory built-in, but even
-# Twisted devs don't like the current approach, see:
-# https://groups.google.com/forum/#!topic/python-tulip/9lIABK73zAc
-#
-# A similar approach was implemented at higher level in Tulip example
-# code, see:
-# https://github.com/leetreveil/tulip/blob/master/examples/cacheclt.py
 
 #---------------------------------------------------------------------------#
 # Exported symbols
 #---------------------------------------------------------------------------#
 __all__ = [
     "ModbusClientProtocol",
-    # "ModbusUdpClientProtocol",
-    # "ModbusClientFactory",
 ]
+#----------------------------------------------------------------------#
