@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 #---------------------------------------------------------------------------#
 # Connected Client Protocols
 #---------------------------------------------------------------------------#
-class ModbusClientProtocol(ModbusClientMixin):
+class AsyncModbusClientMixin(ModbusClientMixin):
     """Protocol running high level modbus logic on top of asynchronous loop.
 
     Behavior specific to an asynchronous framework like Twisted or asyncio is
@@ -27,18 +27,13 @@ class ModbusClientProtocol(ModbusClientMixin):
     async implementation.
     """
 
-    def __init__(self, async_adapter, framer=None):
+    def __init__(self, framer=None):
         ''' Initializes the framer module
 
         :param framer: The framer to use for the protocol.
-        :param async_adapter: Adapter for used asynchronous framework.
         '''
         self._connected = False
         self.framer = framer or ModbusSocketFramer(ClientDecoder())
-
-        # set up adapter to async framework:
-        self.async_adapter = async_adapter
-        self.async_adapter.owner = self
 
         if isinstance(self.framer, ModbusSocketFramer):
             self.transaction = DictTransactionManager(self)
@@ -59,7 +54,7 @@ class ModbusClientProtocol(ModbusClientMixin):
         _logger.debug("Client disconnected from modbus server: %s" % reason)
         self._connected = False
         for tid in list(self.transaction):
-            self.async_adapter.raise_future(self.transaction.getTransaction(tid), ConnectionException('Connection lost during request'))
+            self.raise_future(self.transaction.getTransaction(tid), ConnectionException('Connection lost during request'))
 
     def dataReceived(self, data):
         ''' Get response, check for valid message, decode result
@@ -74,7 +69,7 @@ class ModbusClientProtocol(ModbusClientMixin):
         '''
         request.transaction_id = self.transaction.getNextTID()
         packet = self.framer.buildPacket(request)
-        self.async_adapter.transport.write(packet)
+        self.transport_.write(packet)
         return self._buildResponse(request.transaction_id)
 
     def _handleResponse(self, reply):
@@ -86,7 +81,7 @@ class ModbusClientProtocol(ModbusClientMixin):
             tid = reply.transaction_id
             handler = self.transaction.getTransaction(tid)
             if handler:
-                self.async_adapter.resolve_future(handler, reply)
+                self.resolve_future(handler, reply)
             else:
                 _logger.debug("Unrequested message: " + str(reply))
 
@@ -97,18 +92,31 @@ class ModbusClientProtocol(ModbusClientMixin):
         :param tid: The transaction identifier for this response
         :returns: A defer linked to the latest request
         '''
-        f = self.async_adapter.create_future()
+        f = self.create_future()
         if not self._connected:
-            self.async_adapter.raise_future(f, ConnectionException('Client is not connected'))
+            self.raise_future(f, ConnectionException('Client is not connected'))
         else:
             self.transaction.addTransaction(f, tid)
         return f
+
+    @property
+    def transport_(self):
+        raise NotImplementedError()
+
+    def create_future(self):
+        raise NotImplementedError()
+
+    def resolve_future(self, f, result):
+        raise NotImplementedError()
+
+    def raise_future(self, f, exc):
+        raise NotImplementedError()
 
 
 #---------------------------------------------------------------------------#
 # Exported symbols
 #---------------------------------------------------------------------------#
 __all__ = [
-    "ModbusClientProtocol",
+    "AsyncModbusClientMixin",
 ]
 #----------------------------------------------------------------------#

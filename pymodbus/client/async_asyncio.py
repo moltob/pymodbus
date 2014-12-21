@@ -1,32 +1,24 @@
 """Asynchronous framework adapter for asyncio."""
 import asyncio
-from functools import partial
-from pymodbus.client import async_common
+from pymodbus.client.async_common import AsyncModbusClientMixin
 
 
-class AsyncioAdapter(asyncio.Protocol):
-    """Adapter of asynchronous functions to asyncio.
-
-    Class is simply delegating between owner and asyncio. Callbacks of the
-    framework are forwarded to owner and calls of owner are adapted to
-    framework."""
-
-    #: Object owning this adapter instance.
-    owner = None
+class ModbusClientProtocol(asyncio.Protocol, AsyncModbusClientMixin):
+    """..."""
 
     #: Transport object of current connection.
     transport = None
 
     def connection_made(self, transport):
         self.transport = transport
-        self.owner.connectionMade()
+        AsyncModbusClientMixin.connectionMade(self)
 
     def connection_lost(self, reason):
         self.transport = None
-        self.owner.connectionLost(reason)
+        AsyncModbusClientMixin.connectionLost(self, reason)
 
     def data_received(self, data):
-        self.owner.dataReceived(data)
+        AsyncModbusClientMixin.dataReceived(self, data)
 
     def create_future(self):
         return asyncio.Future()
@@ -37,7 +29,6 @@ class AsyncioAdapter(asyncio.Protocol):
     def raise_future(self, f, exc):
         f.set_exception(exc)
 
-#---------------------------------------------------------------------------#
-# Convenience definitions
-#---------------------------------------------------------------------------#
-ModbusClientProtocol = partial(async_common.ModbusClientProtocol, AsyncioAdapter())
+    @property
+    def transport_(self):
+        return self.transport

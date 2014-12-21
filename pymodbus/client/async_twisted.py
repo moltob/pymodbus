@@ -1,28 +1,20 @@
 """Asynchronous adapter implementation for Twisted."""
-from functools import partial
 from twisted.internet import defer, protocol
 from twisted.python.failure import Failure
-from pymodbus.client import async_common
+from pymodbus.client.async_common import AsyncModbusClientMixin
 
 
-class TwistedAdapter(protocol.Protocol):
-    """Adapter of asynchronous functions to Twisted networking engine.
-
-    Class is simply delegating between owner and Twisted. Callbacks of the
-    framework are forwarded to owner and calls of owner are adapted to
-    framework."""
-
-    #: Object owning this adapter instance.
-    owner = None
+class ModbusClientProtocol(protocol.Protocol, AsyncModbusClientMixin):
+    """..."""
 
     def connectionMade(self):
-        self.owner.connectionMade()
+        AsyncModbusClientMixin.connectionMade(self)
 
     def connectionLost(self, reason=protocol.connectionDone):
-        self.owner.connectionLost(reason)
+        AsyncModbusClientMixin.connectionLost(self, reason)
 
     def dataReceived(self, data):
-        self.owner.dataReceived(data)
+        AsyncModbusClientMixin.dataReceived(self, data)
 
     def create_future(self):
         return defer.Deferred()
@@ -33,7 +25,6 @@ class TwistedAdapter(protocol.Protocol):
     def raise_future(self, f, exc):
         f.fail(Failure(exc))
 
-#---------------------------------------------------------------------------#
-# Convenience definitions
-#---------------------------------------------------------------------------#
-ModbusClientProtocol = partial(async_common.ModbusClientProtocol, TwistedAdapter())
+    @property
+    def transport_(self):
+        return self.transport
