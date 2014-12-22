@@ -5,3 +5,4 @@ dist/
 pymodbus.egg-info/
 .coverage
 *__pycache__
+.idea/
