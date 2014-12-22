@@ -4,7 +4,7 @@ from pymodbus.client.async_common import AsyncModbusClientMixin
 
 
 class ModbusClientProtocol(asyncio.Protocol, AsyncModbusClientMixin):
-    """..."""
+    """Asyncio specific implementation of asynchronous modubus client protocol."""
 
     #: Transport object of current connection.
     transport = None

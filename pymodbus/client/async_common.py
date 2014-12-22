@@ -18,13 +18,11 @@ _logger = logging.getLogger(__name__)
 # Connected Client Protocols
 #---------------------------------------------------------------------------#
 class AsyncModbusClientMixin(ModbusClientMixin):
-    """Protocol running high level modbus logic on top of asynchronous loop.
+    """Abstract asynchronous protocol running high level modbus logic on top
+    of asynchronous loop.
 
     Behavior specific to an asynchronous framework like Twisted or asyncio is
-    delegated to an injected adapter class.
-
-    This class is therefore a glue layer between pymodbus logic and a certain
-    async implementation.
+    implemented in a derived class.
     """
 
     def __init__(self, framer=None):

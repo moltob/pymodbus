@@ -5,7 +5,7 @@ from pymodbus.client.async_common import AsyncModbusClientMixin
 
 
 class ModbusClientProtocol(protocol.Protocol, AsyncModbusClientMixin):
-    """..."""
+    """Twisted specific implementation of asynchronous modbus client protocol."""
 
     def connectionMade(self):
         AsyncModbusClientMixin.connectionMade(self)
