@@ -25,6 +25,8 @@ class AsyncModbusClientMixin(ModbusClientMixin):
     implemented in a derived class.
     """
 
+    transport = None
+
     def __init__(self, framer=None):
         ''' Initializes the framer module
 
@@ -38,13 +40,13 @@ class AsyncModbusClientMixin(ModbusClientMixin):
         else:
             self.transaction = FifoTransactionManager(self)
 
-    def connectionMade(self):
+    def _connectionMade(self):
         ''' Called upon a successful client connection.
         '''
         _logger.debug("Client connected to modbus server")
         self._connected = True
 
-    def connectionLost(self, reason):
+    def _connectionLost(self, reason):
         ''' Called upon a client disconnect
 
         :param reason: The reason for the disconnect
@@ -54,7 +56,7 @@ class AsyncModbusClientMixin(ModbusClientMixin):
         for tid in list(self.transaction):
             self.raise_future(self.transaction.getTransaction(tid), ConnectionException('Connection lost during request'))
 
-    def dataReceived(self, data):
+    def _dataReceived(self, data):
         ''' Get response, check for valid message, decode result
 
         :param data: The data returned from the server
@@ -67,7 +69,7 @@ class AsyncModbusClientMixin(ModbusClientMixin):
         '''
         request.transaction_id = self.transaction.getNextTID()
         packet = self.framer.buildPacket(request)
-        self.transport_.write(packet)
+        self.transport.write(packet)
         return self._buildResponse(request.transaction_id)
 
     def _handleResponse(self, reply):
@@ -96,10 +98,6 @@ class AsyncModbusClientMixin(ModbusClientMixin):
         else:
             self.transaction.addTransaction(f, tid)
         return f
-
-    @property
-    def transport_(self):
-        raise NotImplementedError()
 
     def create_future(self):
         raise NotImplementedError()

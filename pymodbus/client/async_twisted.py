@@ -8,13 +8,13 @@ class ModbusClientProtocol(protocol.Protocol, AsyncModbusClientMixin):
     """Twisted specific implementation of asynchronous modbus client protocol."""
 
     def connectionMade(self):
-        AsyncModbusClientMixin.connectionMade(self)
+        self._connectionMade()
 
     def connectionLost(self, reason=protocol.connectionDone):
-        AsyncModbusClientMixin.connectionLost(self, reason)
+        self._connectionLost(reason)
 
     def dataReceived(self, data):
-        AsyncModbusClientMixin.dataReceived(self, data)
+        self._dataReceived(data)
 
     def create_future(self):
         return defer.Deferred()
@@ -24,7 +24,3 @@ class ModbusClientProtocol(protocol.Protocol, AsyncModbusClientMixin):
 
     def raise_future(self, f, exc):
         f.fail(Failure(exc))
-
-    @property
-    def transport_(self):
-        return self.transport
