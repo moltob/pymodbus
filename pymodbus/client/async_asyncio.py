@@ -66,13 +66,12 @@ class ReconnectingAsyncioModbusTcpClient(object):
         """Resets wait before next reconnect to minimal period."""
         self.delay_ms = 100
 
-
     @asyncio.coroutine
     def start(self, host, port=502):
         # force reconnect if required:
         self.stop()
 
-        _logger.debug('Connecting to %s:%d.' % (host, port))
+        _logger.debug('Connecting to %s:%s.' % (host, port))
         self.host = host
         self.port = port
 
@@ -98,7 +97,7 @@ class ReconnectingAsyncioModbusTcpClient(object):
         _logger.debug('Connecting.')
         try:
             yield from self.loop.create_connection(self._create_protocol, self.host, self.port)
-            _logger.info('Connected to %s:%d.' % (self.host, self.port))
+            _logger.info('Connected to %s:%s.' % (self.host, self.port))
         except Exception as ex:
             _logger.warning('Failed to connect: %s' % ex)
             asyncio.async(self._reconnect(), loop=self.loop)

@@ -41,11 +41,10 @@ def run_coroutine(coro):
     """Runs a coroutine as top-level task by iterating through all yielded steps."""
 
     result = None
-    iter_ = coro()
     try:
         # step through all parts of coro without scheduling anything else:
         while True:
-            result = iter_.send(result)
+            result = coro.send(result)
     except StopIteration as ex:
         # coro reached end pass on its return value:
         return ex.value
