@@ -60,9 +60,9 @@ class ReconnectingAsyncioModbusTcpClient(object):
         self.port = 0
 
         self.connected = False
-        self.reset_wait()
+        self.reset_delay()
 
-    def reset_wait(self):
+    def reset_delay(self):
         """Resets wait before next reconnect to minimal period."""
         self.delay_ms = 100
 

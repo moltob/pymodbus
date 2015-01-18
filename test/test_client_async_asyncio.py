@@ -44,7 +44,7 @@ def test_factory_reset_wait_before_reconnect():
     client.delay_ms *= 2
 
     assert client.delay_ms > initial_delay
-    client.reset_wait()
+    client.reset_delay()
     assert client.delay_ms == initial_delay
 
 
