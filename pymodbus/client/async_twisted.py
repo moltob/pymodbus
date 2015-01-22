@@ -23,4 +23,4 @@ class ModbusClientProtocol(protocol.Protocol, AsyncModbusClientMixin):
         f.callback(result)
 
     def raise_future(self, f, exc):
-        f.fail(Failure(exc))
+        f.errback(Failure(exc))
